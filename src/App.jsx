@@ -373,6 +373,20 @@ function SorJuanaModal({user,onClose}){
   const[loading,setLoading]=useState(true);
 
 useEffect(()=>{
+  
+if (!alumno?.id) return;
+
+  const cargarEquipo = async () => {
+    const equipo = await detectarEquipoDelAlumno(alumno.id);
+
+    if (equipo) {
+      setEquipoSeleccionado(equipo);
+      setPromptEquipo(equipo.prompt);
+      setModalCrearEquipo(false);
+    }
+  };
+
+  cargarEquipo();
   supabase
     .from("equipos")
     .select("*")
