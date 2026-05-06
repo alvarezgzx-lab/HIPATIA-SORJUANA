@@ -172,6 +172,7 @@ function HipatiaModal({user,onClose}){
   const[launched,setLaunched]=useState(false);
   const[creating,setCreating]=useState(false);
   const setF=(k,v)=>setForm(p=>({...p,[k]:v}));
+  const[errorEquipo,setErrorEquipo]=useState("");
 
 const lookupMember = async(idx, nom) => {
   if(nom.length !== 4){
@@ -220,18 +221,49 @@ CRITERIOS QUE EL DOCENTE PRIORIZARÁ EN ESTA SESIÓN:
 INSTRUCCIÓN DE ARRANQUE: Confirma los datos de sesión en voz alta, saluda al equipo con calidez y brevedad, explica el proceso en no más de 4 líneas y pide los datos de la Parte A.`;
 
   const handleGo=async()=>{
-    if(!canCreate)return;
-    setCreating(true);
-    const{data}=await supabase.rpc("crear_equipo",{
-      p_integrantes:validMembers.map(m=>m.nom),
-      p_grupo:user.grupo,p_grado:user.grado,p_tema:"",p_fenomeno:""
-    });
+  if(!canCreate)return;
+  setCreating(true);
+  setErrorEquipo("");
+
+  // 1 — Verificar que ningún integrante ya tenga equipo
+  const{data:equiposExist}=await supabase
+    .from("equipos")
+    .select("nombre,integrantes")
+    .eq("grupo",user.grupo);
+
+  const conflicto=validMembers.find(m=>
+    (equiposExist||[]).some(eq=>
+      (eq.integrantes||[]).includes(m.nom)
+    )
+  );
+
+  if(conflicto){
+    const teamName=(equiposExist||[]).find(eq=>
+      (eq.integrantes||[]).includes(conflicto.nom)
+    )?.nombre;
+    setErrorEquipo(
+      `${conflicto.nombre} ya pertenece al equipo "${teamName}". `+
+      `Un alumno solo puede estar en un equipo.`
+    );
     setCreating(false);
-    const equipoNombre=data?.nombreEquipo||"Equipo";
-    window.open(HIPATIA_URL,"_blank");
-    setLaunched(true);
-    copyText(buildPrompt(equipoNombre)).catch(console.error);
-  };
+    return;
+  }
+
+  // 2 — Crear equipo (igual que antes)
+  const{data}=await supabase.rpc("crear_equipo",{
+    p_integrantes:validMembers.map(m=>m.nom),
+    p_grupo:user.grupo,
+    p_grado:user.grado,
+    p_tema:"",
+    p_fenomeno:""
+  });
+  setCreating(false);
+  const equipoNombre=data?.nombreEquipo||"Equipo";
+  window.open(HIPATIA_URL,"_blank");
+  setLaunched(true);
+  copyText(buildPrompt(equipoNombre)).catch(console.error);
+};
+    
 
   useEffect(()=>{const h=e=>e.key==="Escape"&&onClose();window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
 
@@ -298,7 +330,20 @@ INSTRUCCIÓN DE ARRANQUE: Confirma los datos de sesión en voz alta, saluda al e
             </div>
           )}
         </div>
-
+        {errorEquipo&&(
+      <div style={{
+    background:CC.errorBg,
+    border:`1px solid ${CC.errorBd}`,
+    borderRadius:6,
+    padding:"9px 12px",
+    fontFamily:F.mono,
+    fontSize:9,
+    color:CC.errorTxt,
+    marginBottom:14
+  }}>
+    ⚠ {errorEquipo}
+  </div>
+)}
         {!canCreate&&<div style={{background:CC.warningBg,border:`1px solid ${CC.warningBd}`,borderRadius:6,padding:"9px 12px",fontFamily:F.mono,fontSize:9,color:CC.warningTxt,marginBottom:14}}>⚠ Se necesitan mínimo 2 integrantes con nomenclatura válida</div>}
 
         <div style={{display:"flex",gap:10,justifyContent:"flex-end",alignItems:"center"}}>
@@ -324,42 +369,25 @@ function SorJuanaModal({user,onClose}){
   const[launched,setLaunched]=useState(false);
   const[loading,setLoading]=useState(true);
 
-  useEffect(()=>{
-    supabase.from("equipos").select("*").eq("grupo",user.grupo).then(({data})=>{
-      setEquipos(data||[]);setLoading(false);
+useEffect(()=>{
+  supabase
+    .from("equipos")
+    .select("*")
+    .eq("grupo",user.grupo)
+    .then(({data})=>{
+      const teams = data || [];
+      setEquipos(teams);
+
+      // Auto-detectar equipo del alumno
+      const miEquipo = teams.find(eq=>
+        Array.isArray(eq.integrantes) &&
+        eq.integrantes.includes(user.nomenclatura)
+      );
+      if(miEquipo) selectEquipo(miEquipo);
+
+      setLoading(false);
     });
-  },[user.grupo]);
-
-  const selectEquipo=(eq)=>{
-    setEquipo(eq);
-    const subs=Array.isArray(eq.subtemas)?eq.subtemas:[];
-    const myIdx=eq.integrantes?.indexOf(user.nomenclatura);
-    const mySubs=subs.filter(s=>s.alumno===user.nomenclatura||(myIdx>=0&&s.alumnoIdx===myIdx));
-    setSubtemas(mySubs.length>0?mySubs.map(s=>s.n):subs.map(s=>s.n));
-  };
-
-  const buildPrompt=()=>{
-    if(!equipo)return"";
-    return`Sor Juana, inicio mi sesión individual.
-- Número de sesión: ${sesion}
-- ¿Retomas sesión anterior? ${sesion==="2"?(retorno||"Sí — indicar subtema y etapa"):"No"}
-
-${equipo.prompt_hijo||"[Prompt Hijo pendiente — completa primero la sesión grupal con Hipatia]"}
-
-DATOS INDIVIDUALES:
-Mi nombre: ${user.nombre}
-Mi nomenclatura: ${user.nomenclatura}
-Mis subtemas asignados: ${subtemas.length>0?"Subtemas "+subtemas.join(" y "):"[seleccionar]"}
-Tipo de texto: ${tipo}`;
-  };
-
-  const canGo=equipo&&equipo.prompt_hijo&&subtemas.length>0;
-
-  const handleGo=()=>{
-    window.open(SORJUANA_URL,"_blank");
-    setLaunched(true);
-    copyText(buildPrompt()).catch(console.error);
-  };
+},[user.grupo]);
 
   useEffect(()=>{const h=e=>e.key==="Escape"&&onClose();window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
 
