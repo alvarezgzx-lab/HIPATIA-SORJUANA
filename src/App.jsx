@@ -326,20 +326,7 @@ INSTRUCCIÓN DE ARRANQUE: Confirma los datos de sesión en voz alta, saluda al e
             </div>
           )}
         </div>
-        {errorEquipo&&(
-      <div style={{
-    background:CC.errorBg,
-    border:`1px solid ${CC.errorBd}`,
-    borderRadius:6,
-    padding:"9px 12px",
-    fontFamily:F.mono,
-    fontSize:9,
-    color:CC.errorTxt,
-    marginBottom:14
-  }}>
-    ⚠ {errorEquipo}
-  </div>
-)}
+        {errorEquipo&&(<div style={{background:CC.errorBg,border:`1px solid ${CC.errorBd}`,borderRadius:6,padding:"9px 12px",fontFamily:F.mono,fontSize:9,Color:CC.errorTxt,marginBottom:14}}>⚠ {errorEquipo}</div>)}    
         {!canCreate&&<div style={{background:CC.warningBg,border:`1px solid ${CC.warningBd}`,borderRadius:6,padding:"9px 12px",fontFamily:F.mono,fontSize:9,color:CC.warningTxt,marginBottom:14}}>⚠ Se necesitan mínimo 2 integrantes con nomenclatura válida</div>}
 
         <div style={{display:"flex",gap:10,justifyContent:"flex-end",alignItems:"center"}}>
