@@ -205,53 +205,41 @@ function IdleModal({user,onStay,onLeave}){
   );
 }
 // ─── HIPATIA MODAL ────────────────────────────────────────────────────────────
-function HipatiaModal({user,onClose});
+function HipatiaModal({user,onClose}){
   const today=new Date().toISOString().split("T")[0];
   const[members,setMembers]=useState([{nom:user.nomenclatura,nombre:user.nombre,loading:false,error:""}]);
   const[form,setForm]=useState({fecha:today,sesion:"Primera",retorno:"",ficha:"Sí",asign:"Asignado"});
   const[launched,setLaunched]=useState(false);
   const[creating,setCreating]=useState(false);
-  const setF=(k,v)=>setForm(p=>({...p,[k]:v}));
   const[errorEquipo,setErrorEquipo]=useState("");
-const detectarEquipoDelAlumno = async (alumnoId) => {
-  const { data, error } = await supabase
-    .from("integrantes")
-    .select(`
-      equipo_id,
-      equipos (
-        id,
-        nombre,
-        prompt
-      )
-    `)
-    .eq("alumno_id", alumnoId)
-    .single();
+  const[existingTeam,setExistingTeam]=useState(null);
+  const[checkingTeam,setCheckingTeam]=useState(true);
+  const setF=(k,v)=>setForm(p=>({...p,[k]:v}));
 
-  if (error) {
-    console.log("Alumno sin equipo aún");
-    return null;
-  }
+  useEffect(()=>{
+    supabase.from("equipos")
+      .select("*")
+      .contains("integrantes",[user.nomenclatura])
+      .maybeSingle()
+      .then(({data})=>{
+        if(data) setExistingTeam(data);
+        setCheckingTeam(false);
+      });
+  },[]);
 
-  return data.equipos;
-};
-const lookupMember = async(idx, nom) => {
-  if(nom.length !== 4){
-    setMembers(p=>p.map((m,i)=>
-      i===idx?{...m,nombre:"",error:""}:m));
-    return;
-  }
-  setMembers(p=>p.map((m,i)=>
-    i===idx?{...m,loading:true,error:""}:m));
-  const{data} = await supabase
-    .rpc("buscar_alumno",{p_nomenclatura:nom.toUpperCase()});
-  const alumno = data?.[0];
-  setMembers(p=>p.map((m,i)=>i===idx?{
-    ...m,
-    nombre:alumno?.nombre||"",
-    loading:false,
-    error:alumno?"":"No encontrado: "+nom
-  }:m));
-};
+  const lookupMember=async(idx,nom)=>{
+    if(nom.length!==4){
+      setMembers(p=>p.map((m,i)=>i===idx?{...m,nombre:"",error:""}:m));
+      return;
+    }
+    setMembers(p=>p.map((m,i)=>i===idx?{...m,loading:true,error:""}:m));
+    const{data}=await supabase.rpc("buscar_alumno",{p_nomenclatura:nom.toUpperCase()});
+    const alumno=data?.[0];
+    setMembers(p=>p.map((m,i)=>i===idx?{
+      ...m,nombre:alumno?.nombre||"",loading:false,
+      error:alumno?"":"No encontrado: "+nom
+    }:m));
+  };
 
   const addMember=()=>{if(members.length<7)setMembers(p=>[...p,{nom:"",nombre:"",loading:false,error:""}]);};
   const removeMember=idx=>setMembers(p=>p.filter((_,i)=>i!==idx));
@@ -281,47 +269,65 @@ CRITERIOS QUE EL DOCENTE PRIORIZARÁ EN ESTA SESIÓN:
 INSTRUCCIÓN DE ARRANQUE: Confirma los datos de sesión en voz alta, saluda al equipo con calidez y brevedad, explica el proceso en no más de 4 líneas y pide los datos de la Parte A.`;
 
   const handleGo=async()=>{
-  if(!canCreate)return;
-  setCreating(true);
-  setErrorEquipo("");
-  const{data:equiposExist}=await supabase
-    .from("equipos")
-    .select("nombre,integrantes")
-    .eq("grupo",user.grupo);
-
-  const conflicto=validMembers.find(m=>
-    (equiposExist||[]).some(eq=>
-      (eq.integrantes||[]).includes(m.nom)
-    )
-  );
-
-  if(conflicto){
-    const teamName=(equiposExist||[]).find(eq=>
-      (eq.integrantes||[]).includes(conflicto.nom)
-    )?.nombre;
-    setErrorEquipo(
-      `${conflicto.nombre} ya pertenece al equipo "${teamName}". `+
-      `Un alumno solo puede estar en un equipo.`
-    );
+    if(!canCreate)return;
+    setCreating(true);setErrorEquipo("");
+    const{data}=await supabase.rpc("crear_equipo",{
+      p_integrantes:validMembers.map(m=>m.nom),
+      p_grupo:user.grupo,p_grado:user.grado,p_tema:"",p_fenomeno:""
+    });
+    if(data?.ok===false){
+      setErrorEquipo(data.error||"Error al crear el equipo");
+      setCreating(false);return;
+    }
     setCreating(false);
-    return;
-  }
-  const{data}=await supabase.rpc("crear_equipo",{
-    p_integrantes:validMembers.map(m=>m.nom),
-    p_grupo:user.grupo,
-    p_grado:user.grado,
-    p_tema:"",
-    p_fenomeno:""
-  });
-  setCreating(false);
-  const equipoNombre=data?.nombreEquipo||"Equipo";
-  window.open(HIPATIA_URL,"_blank");
-  setLaunched(true);
-  copyText(buildPrompt(equipoNombre)).catch(console.error);
-};
-    
+    const equipoNombre=data?.nombreEquipo||"Equipo";
+    window.open(HIPATIA_URL,"_blank");
+    setLaunched(true);
+    copyText(buildPrompt(equipoNombre)).catch(console.error);
+  };
 
   useEffect(()=>{const h=e=>e.key==="Escape"&&onClose();window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
+
+  if(checkingTeam) return(
+    <div className="modal-bg">
+      <div className="modal" style={{textAlign:"center",padding:48}}>
+        <div style={{fontFamily:F.mono,fontSize:11,color:CC.grisCiudad}}>Verificando equipo...</div>
+      </div>
+    </div>
+  );
+
+  if(existingTeam) return(
+    <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20,paddingBottom:16,borderBottom:`1px solid ${CC.grisPapel}`}}>
+          <div>
+            <div style={{fontFamily:F.display,fontSize:22,fontWeight:700,color:CC.tinta,letterSpacing:"-0.01em"}}>Tu equipo ya está registrado</div>
+            <div style={{fontFamily:F.mono,fontSize:9,color:CC.grisCiudad,marginTop:3,letterSpacing:"0.06em",textTransform:"uppercase"}}>{existingTeam.nombre} · {existingTeam.grupo}</div>
+          </div>
+          <button onClick={onClose} className="btn-g" style={{padding:"4px 10px"}}>✕</button>
+        </div>
+        <div style={{background:CC.infoBg,border:`1px solid ${CC.infoBd}`,borderRadius:8,padding:"14px 16px",marginBottom:20}}>
+          <div style={{fontFamily:F.mono,fontSize:9,color:CC.azulNoche,marginBottom:10,letterSpacing:"0.06em",textTransform:"uppercase"}}>Integrantes</div>
+          {(existingTeam.integrantes||[]).map((nom,i)=>(
+            <div key={i} style={{fontFamily:F.body,fontSize:13,color:CC.tinta,padding:"4px 0",borderBottom:i<existingTeam.integrantes.length-1?`1px solid ${CC.grisPapel}`:"none"}}>{nom}</div>
+          ))}
+        </div>
+        {!existingTeam.prompt_hijo&&(
+          <div style={{background:CC.warningBg,border:`1px solid ${CC.warningBd}`,borderRadius:6,padding:"9px 12px",fontFamily:F.mono,fontSize:9,color:CC.warningTxt,marginBottom:16}}>
+            ⚠ El equipo aún no tiene Prompt Hijo. Espera a que Hipatia lo genere en la sesión grupal.
+          </div>
+        )}
+        <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+          <button onClick={onClose} className="btn-g">Cerrar</button>
+          {existingTeam.prompt_hijo&&(
+            <button onClick={()=>{window.open(HIPATIA_URL,"_blank");copyText(existingTeam.prompt_hijo).catch(console.error);}} className="btn-p btn-t">
+              ⎘ Copiar prompt e ir a Hipatia
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   return(
     <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&onClose()}>
@@ -333,7 +339,6 @@ INSTRUCCIÓN DE ARRANQUE: Confirma los datos de sesión en voz alta, saluda al e
           </div>
           <button onClick={onClose} className="btn-g" style={{padding:"4px 10px"}}>✕</button>
         </div>
-
         <div style={{marginBottom:20}}>
           <div style={{fontFamily:F.mono,fontSize:9,color:CC.azulNoche,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:12}}>① Integrantes del equipo</div>
           {members.map((m,i)=>(
@@ -350,8 +355,7 @@ INSTRUCCIÓN DE ARRANQUE: Confirma los datos de sesión en voz alta, saluda al e
                   {m.loading?"Buscando...":m.error||m.nombre||"—"}
                 </div>
               </div>
-              {i>0&&<button onClick={()=>removeMember(i)} style={{background:"transparent",border:"none",cursor:"pointer",color:CC.grisCiudad,fontSize:16,marginTop:i===0?0:0,padding:"0 4px"}}>×</button>}
-              {i===0&&<div/>}
+              {i>0?<button onClick={()=>removeMember(i)} style={{background:"transparent",border:"none",cursor:"pointer",color:CC.grisCiudad,fontSize:16,padding:"0 4px"}}>×</button>:<div/>}
             </div>
           ))}
           {members.length<7&&(
@@ -359,9 +363,8 @@ INSTRUCCIÓN DE ARRANQUE: Confirma los datos de sesión en voz alta, saluda al e
               + Añadir integrante ({members.length}/7)
             </button>
           )}
-          {canCreate&&<div style={{fontFamily:F.mono,fontSize:9,color:CC.successTxt,marginTop:8}}>✓ {validMembers.length} integrantes confirmados — se asignará nombre de equipo automáticamente</div>}
+          {canCreate&&<div style={{fontFamily:F.mono,fontSize:9,color:CC.successTxt,marginTop:8}}>✓ {validMembers.length} integrantes confirmados</div>}
         </div>
-
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
           {[
             {k:"fecha",l:"Fecha",type:"date"},
@@ -386,13 +389,12 @@ INSTRUCCIÓN DE ARRANQUE: Confirma los datos de sesión en voz alta, saluda al e
             </div>
           )}
         </div>
-        {errorEquipo&&(<div style={{background:CC.errorBg,border:`1px solid ${CC.errorBd}`,borderRadius:6,padding:"9px 12px",fontFamily:F.mono,fontSize:9,Color:CC.errorTxt,marginBottom:14}}>⚠ {errorEquipo}</div>)}    
+        {errorEquipo&&<div style={{background:CC.errorBg,border:`1px solid ${CC.errorBd}`,borderRadius:6,padding:"9px 12px",fontFamily:F.mono,fontSize:9,color:CC.errorTxt,marginBottom:14}}>⚠ {errorEquipo}</div>}
         {!canCreate&&<div style={{background:CC.warningBg,border:`1px solid ${CC.warningBd}`,borderRadius:6,padding:"9px 12px",fontFamily:F.mono,fontSize:9,color:CC.warningTxt,marginBottom:14}}>⚠ Se necesitan mínimo 2 integrantes con nomenclatura válida</div>}
-
         <div style={{display:"flex",gap:10,justifyContent:"flex-end",alignItems:"center"}}>
           {launched&&<span style={{fontFamily:F.mono,fontSize:9,color:CC.successTxt}}>✓ Copiado — abriendo Hipatia...</span>}
           <button onClick={onClose} className="btn-g">Cancelar</button>
-          <button onClick={handleGo} disabled={!canCreate||creating} className="btn-p btn-t" style={{opacity:canCreate&&!creating?1:0.4,cursor:canCreate&&!creating?"pointer":"not-allowed"}}>
+          <button onClick={handleGo} disabled={!canCreate||creating} className="btn-p btn-t" style={{opacity:canCreate&&!creating?1:0.4}}>
             {creating?"Creando equipo...":launched?"✓ Listo":"⎘ Copiar y abrir Hipatia"}
           </button>
         </div>
@@ -412,37 +414,49 @@ function SorJuanaModal({user,onClose}){
   const[launched,setLaunched]=useState(false);
   const[loading,setLoading]=useState(true);
 
-useEffect(()=>{
-  
-if (!alumno?.id) return;
-
-  const cargarEquipo = async () => {
-    const equipo = await detectarEquipoDelAlumno(alumno.id);
-
-    if (equipo) {
-      setEquipoSeleccionado(equipo);
-      setPromptEquipo(equipo.prompt);
-      setModalCrearEquipo(false);
-    }
+  const selectEquipo=(eq)=>{
+    setEquipo(eq);
+    const subs=Array.isArray(eq.subtemas)?eq.subtemas:[];
+    const mySubs=subs.filter(s=>s.alumno===user.nomenclatura);
+    setSubtemas(mySubs.length>0?mySubs.map(s=>s.n):subs.map(s=>s.n));
   };
 
-  cargarEquipo();
-  supabase
-    .from("equipos")
-    .select("*")
-    .eq("grupo",user.grupo)
-    .then(({data})=>{
-      const teams = data || [];
-      setEquipos(teams);
-      const miEquipo = teams.find(eq=>
-        Array.isArray(eq.integrantes) &&
-        eq.integrantes.includes(user.nomenclatura)
-      );
-      if(miEquipo) selectEquipo(miEquipo);
+  useEffect(()=>{
+    supabase.from("equipos").select("*").eq("grupo",user.grupo)
+      .then(({data})=>{
+        const all=data||[];
+        setEquipos(all);
+        setLoading(false);
+        const myTeam=all.find(e=>
+          Array.isArray(e.integrantes)&&
+          e.integrantes.includes(user.nomenclatura)
+        );
+        if(myTeam) selectEquipo(myTeam);
+      });
+  },[user.grupo]);
 
-      setLoading(false);
-    });
-},[user.grupo]);
+  const buildPrompt=()=>{
+    if(!equipo)return"";
+    return`Sor Juana, inicio mi sesión individual.
+- Número de sesión: ${sesion}
+- ¿Retomas sesión anterior? ${sesion==="2"?(retorno||"Sí — indicar subtema y etapa"):"No"}
+
+${equipo.prompt_hijo||"[Prompt Hijo pendiente — completa primero la sesión grupal con Hipatia]"}
+
+DATOS INDIVIDUALES:
+Mi nombre: ${user.nombre}
+Mi nomenclatura: ${user.nomenclatura}
+Mis subtemas asignados: ${subtemas.length>0?"Subtemas "+subtemas.join(" y "):"[seleccionar]"}
+Tipo de texto: ${tipo}`;
+  };
+
+  const canGo=equipo&&equipo.prompt_hijo&&subtemas.length>0;
+
+  const handleGo=()=>{
+    window.open(SORJUANA_URL,"_blank");
+    setLaunched(true);
+    copyText(buildPrompt()).catch(console.error);
+  };
 
   useEffect(()=>{const h=e=>e.key==="Escape"&&onClose();window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
 
@@ -456,14 +470,13 @@ if (!alumno?.id) return;
           </div>
           <button onClick={onClose} className="btn-g" style={{padding:"4px 10px"}}>✕</button>
         </div>
-
         <div style={{marginBottom:18}}>
-          <div style={{fontFamily:F.mono,fontSize:9,color:CC.azulNoche,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:10}}>① Selecciona tu equipo</div>
+          <div style={{fontFamily:F.mono,fontSize:9,color:CC.azulNoche,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:10}}>① Tu equipo</div>
           {loading
             ?<div style={{fontFamily:F.mono,fontSize:10,color:CC.grisCiudad}}>Cargando equipos...</div>
             :equipos.length===0
               ?<div style={{fontFamily:F.mono,fontSize:9,color:CC.warningTxt,background:CC.warningBg,border:`1px solid ${CC.warningBd}`,borderRadius:6,padding:"10px 12px"}}>
-                No hay equipos registrados en {user.grupo} todavía. Realiza primero la sesión grupal con Hipatia.
+                No hay equipos registrados en {user.grupo}. Realiza primero la sesión grupal con Hipatia.
               </div>
               :<div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                 {equipos.map(eq=>(
@@ -481,11 +494,10 @@ if (!alumno?.id) return;
               </div>
           }
         </div>
-
         {equipo&&(
           <>
             <div style={{marginBottom:16}}>
-              <div style={{fontFamily:F.mono,fontSize:9,color:CC.azulNoche,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:8}}>② Tus subtemas asignados</div>
+              <div style={{fontFamily:F.mono,fontSize:9,color:CC.azulNoche,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:8}}>② Tus subtemas</div>
               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                 {([1,2,3,4,5,6,7]).map(n=>{
                   const sel=subtemas.includes(n);
@@ -503,7 +515,6 @@ if (!alumno?.id) return;
                 })}
               </div>
             </div>
-
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
               <div className="field" style={{marginBottom:0}}>
                 <label className="cc-label">Tipo de texto</label>
@@ -527,13 +538,11 @@ if (!alumno?.id) return;
                 </div>
               )}
             </div>
-
             {!equipo.prompt_hijo&&(
               <div style={{background:CC.warningBg,border:`1px solid ${CC.warningBd}`,borderRadius:6,padding:"9px 12px",fontFamily:F.mono,fontSize:9,color:CC.warningTxt,marginBottom:14}}>
                 ⚠ El equipo {equipo.nombre} aún no tiene Prompt Hijo. Completa primero la sesión grupal con Hipatia.
               </div>
             )}
-
             {canGo&&(
               <div style={{marginBottom:14}}>
                 <label className="cc-label" style={{marginBottom:5}}>Vista previa del prompt</label>
@@ -542,11 +551,10 @@ if (!alumno?.id) return;
             )}
           </>
         )}
-
         <div style={{display:"flex",gap:10,justifyContent:"flex-end",alignItems:"center"}}>
           {launched&&<span style={{fontFamily:F.mono,fontSize:9,color:CC.successTxt}}>✓ Copiado — abriendo Sor Juana...</span>}
           <button onClick={onClose} className="btn-g">Cancelar</button>
-          <button onClick={handleGo} disabled={!canGo} className="btn-p btn-t" style={{opacity:canGo?1:0.35,cursor:canGo?"pointer":"not-allowed"}}>
+          <button onClick={handleGo} disabled={!canGo} className="btn-p btn-t" style={{opacity:canGo?1:0.35}}>
             {launched?"✓ Listo":"⎘ Copiar y abrir Sor Juana"}
           </button>
         </div>
@@ -554,7 +562,6 @@ if (!alumno?.id) return;
     </div>
   );
 }
-
 // ─── STUDENT PORTAL ───────────────────────────────────────────────────────────
 function StudentPortal({user,sesionActiva,onLogout}){
   const[modal,setModal]=useState(null);
@@ -908,7 +915,5 @@ export default function App(){
       {showIdle&&user&&
         <IdleModal user={user} onStay={handleStay} onLeave={handleLogout}/>}
     </div>
-  );
-}
   );
 }
