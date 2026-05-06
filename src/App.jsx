@@ -377,8 +377,6 @@ useEffect(()=>{
     .then(({data})=>{
       const teams = data || [];
       setEquipos(teams);
-
-      // Auto-detectar equipo del alumno
       const miEquipo = teams.find(eq=>
         Array.isArray(eq.integrantes) &&
         eq.integrantes.includes(user.nomenclatura)
