@@ -224,8 +224,6 @@ INSTRUCCIÓN DE ARRANQUE: Confirma los datos de sesión en voz alta, saluda al e
   if(!canCreate)return;
   setCreating(true);
   setErrorEquipo("");
-
-  // 1 — Verificar que ningún integrante ya tenga equipo
   const{data:equiposExist}=await supabase
     .from("equipos")
     .select("nombre,integrantes")
@@ -248,8 +246,6 @@ INSTRUCCIÓN DE ARRANQUE: Confirma los datos de sesión en voz alta, saluda al e
     setCreating(false);
     return;
   }
-
-  // 2 — Crear equipo (igual que antes)
   const{data}=await supabase.rpc("crear_equipo",{
     p_integrantes:validMembers.map(m=>m.nom),
     p_grupo:user.grupo,
