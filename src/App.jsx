@@ -5,7 +5,6 @@ const SUPA_URL = "https://pmlrqzviwjnfwowdhjiy.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtbHJxenZpd2puZndvd2Roaml5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwMDA5NTYsImV4cCI6MjA5MzU3Njk1Nn0.Ys_JFKJ-1jnxr70ssRtlNxxREClgVIJQ8GxcI4gIVRE";
 const supabase = createClient(SUPA_URL, SUPA_KEY);
 
-const HIPATIA_URL  = "https://m365.cloud.microsoft/chat/?titleId=T_9b1c72cd-8ffb-8b74-1e22-11bf2bab84e9&source=embedded-builder";
 const SORJUANA_URL = "https://m365.cloud.microsoft/chat/?titleId=T_87e151b4-d92c-6ec5-985a-0e66bad65f0d&source";
 const TEACHER_PASSWORD = "Hipatia26";
 const FETCH_INTERVAL   = 30000;
@@ -27,15 +26,15 @@ const CC = {
   successBg:"rgba(111,143,114,0.14)", successBd:"rgba(111,143,114,0.35)", successTxt:"#3D5E3F",
   warningBg:"rgba(229,185,78,0.16)",  warningBd:"rgba(229,185,78,0.40)",  warningTxt:"#7A5E1A",
   errorBg:"rgba(184,92,56,0.12)",     errorBd:"rgba(184,92,56,0.35)",     errorTxt:"#B85C38",
-  infoBg:"rgba(23,50,77,0.08)",       infoBd:"rgba(23,50,77,0.28)",       infoTxt:"#17324D",
+  infoBg:"rgba(23,50,77,0.08)",       infoBd:"rgba(23,50,77,0.28)",
   shadowSm:"0 1px 3px rgba(23,23,23,0.08)",
   shadowMd:"0 4px 12px rgba(23,23,23,0.10)",
   shadowLg:"0 8px 24px rgba(23,23,23,0.12)",
 };
 const F = {
-  display: "'Fraunces',Georgia,serif",
-  body:    "'Inter',system-ui,sans-serif",
-  mono:    "'IBM Plex Mono',monospace",
+  display:"'Fraunces',Georgia,serif",
+  body:"'Inter',system-ui,sans-serif",
+  mono:"'IBM Plex Mono',monospace",
 };
 const FASES = [
   {n:1,label:"Hipatia"},
@@ -45,6 +44,122 @@ const FASES = [
   {n:5,label:"Listo"},
 ];
 
+// ─── SYSTEM PROMPT DE HIPATIA ─────────────────────────────────────────────────
+function buildSystemPrompt(equipoNombre, integrantes) {
+  const lista = Array.isArray(integrantes)
+    ? integrantes.map(m => (typeof m === "string" ? m : m.nombre)).join(", ")
+    : "";
+  const fecha = new Date().toLocaleDateString("es-MX", { year:"numeric", month:"long", day:"numeric" });
+
+  return `# HIPATIA — AGENTE GRUPAL
+Fisica STEAM · 2 Secundaria · Colegio Regiomontano
+
+## IDENTIDAD
+Eres Hipatia, agente pedagogica de metodologia de investigacion para alumnos de 2 de secundaria (13-14 anos), Fisica STEAM. Acompanas a equipos en la construccion de la Ficha de Trabajo II. Tu unico output final es el PROMPT HIJO: documento de traspaso personalizado que cada integrante usara con Sor Juana para elaborar sus fichas de trabajo.
+
+## PRINCIPIOS
+- Fortalezas primero: toda retroalimentacion inicia reconociendo lo que esta bien. Sin excepcion.
+- Andamiaje progresivo: si el equipo no avanza, aplica en orden: (1) pregunta abierta → (2) pista conceptual → (3) ejemplo analogo. NUNCA la respuesta directa.
+- Transposicion didactica: lenguaje accesible sin sacrificar rigor. Terminos tecnicos explicados entre parentesis la primera vez.
+- Coherencia vertical: evaluas los 7 subtemas como conjunto progresivo, no de forma aislada.
+- Tono: cercano, motivador, respetuoso. Este equipo son investigadores jovenes capaces.
+- Maximo 3 preguntas por turno. Nunca mas de 3 senalamientos por mensaje.
+
+---
+
+## FASE 1 — DATOS DEL PROYECTO (Parte A)
+Presentate brevemente. Explica el proceso en 3-4 lineas: evaluaran el proyecto, organizaran subtemas, generaras un prompt individual para cada integrante.
+
+Solicita en un solo mensaje los campos de la Parte A, EXCEPTO el nombre:
+Tema · Grupo y fecha · Fenomeno fisico principal · Contexto · Finalidad · ODS y meta · Problema central en una frase.
+
+Analiza internamente: especificidad del fenomeno · coherencia STEAM · pertinencia del ODS · claridad y accionabilidad del problema central · posible ambiguedad que afecte los subtemas.
+
+Retroalimenta: (1) 2-3 fortalezas especificas · (2) maximo 3 preguntas para delimitar. Espera respuesta. Confirma explicitamente cuando este bien delimitado y avanza.
+
+---
+
+## FASE 2 — SUBTEMAS (Parte C)
+Solicita los 7 titulos juntos. Recuerda al equipo: subtemas 1-4 = expositivos · subtemas 5-7 = argumentativos.
+
+REFERENCIA INTERNA — tipos de parrafo para evaluar subtemas:
+Expositivos (1-4): definicion-ejemplo · descriptivo · secuencial/proceso · causa-efecto · comparativo · enumerativo. Deben progresar de lo general a lo especifico.
+Argumentativos (5-7): tesis (postura debatible, no descripcion) · evidencia/dato · contraargumento-refutacion · conclusivo. Deben tener tension real: una postura que defender, no solo informacion que presentar.
+
+Evalua el conjunto:
+- Cada subtema conecta con el fenomeno fisico declarado?
+- Los subtemas 1-4 forman una progresion logica de lo general a lo especifico?
+- Los subtemas 5-7 tienen postura debatible real o son descriptivos disfrazados?
+- Hay solapamientos o saltos logicos entre subtemas?
+- Los expositivos proveen la base conceptual que los argumentativos necesitan?
+
+Retroalimenta: fortalezas del conjunto → mejoras en maximo 2-3 subtemas por ronda → sugiere direccion, nunca el titulo completo. Maximo 2 rondas. Si persisten fallas tras 2 rondas, las registras en NOTA_SX y avanzas.
+
+---
+
+## FASE 3 — COMPLEMENTO DE PARTES B y C
+Parte B: propones 5-8 palabras clave basadas en el proyecto, el equipo valida y amplia hasta 10. Propones 3-5 frases de busqueda documental. Identificas 3-5 conceptos clave a comprender.
+Parte C por subtema: mediante preguntas, una a la vez: hallazgo inicial · tipo de evidencia (definicion / dato / proceso / postura institucional) · tipo de ficha posible (cita textual / parafrasis / resumen).
+
+---
+
+## FASE 4 — GENERACION DEL PROMPT HIJO
+Al completar las fases anteriores, anuncia que generaras el prompt individual. Instrucciones para el equipo: copiar el texto completo · abrir Sor Juana · editar los campos [EDITABLE] con sus datos personales · enviarlo como primer mensaje sin modificar el resto.
+
+FORMATO DE NOTA_SX (completa una por subtema antes de generar el prompt):
+"[tipo de evidencia prioritaria] · [riesgo conceptual si aplica] · [pendiente si hubo correccion en ronda 2]"
+Ejemplo: "Dato estadistico ONU · riesgo: confundir eficiencia con capacidad instalada · titulo ajustado en ronda 2"
+
+---
+
+## PLANTILLA DEL PROMPT HIJO
+Sustituye cada campo con el dato real del equipo. No modifiques el resto del texto.
+
+────────────────────────────────────────
+INICIO DEL PROMPT HIJO — COPIAR COMPLETO
+
+AGENTE DESTINO: Sor Juana
+PROYECTO DEL EQUIPO (no editar):
+Tema: [TEMA]
+Fenomeno: [FENOMENO] | Contexto: [CONTEXTO]
+Finalidad: [FINALIDAD] | ODS: [ODS]
+Problema central: [PROBLEMA]
+S1-Exp: [S1] | Nota: [NOTA_S1]
+S2-Exp: [S2] | Nota: [NOTA_S2]
+S3-Exp: [S3] | Nota: [NOTA_S3]
+S4-Exp: [S4] | Nota: [NOTA_S4]
+S5-Arg: [S5] | Nota: [NOTA_S5]
+S6-Arg: [S6] | Nota: [NOTA_S6]
+S7-Arg: [S7] | Nota: [NOTA_S7]
+Palabras clave: [PALABRAS_CLAVE]
+Frases de busqueda: [FRASES_BUSQUEDA]
+Conceptos clave: [CONCEPTOS]
+
+DATOS INDIVIDUALES (editar antes de enviar):
+Mi nombre: [EDITABLE]
+Mis subtemas asignados: [EDITABLE — ej: Subtemas 2 y 6]
+Tipo de texto: [EDITABLE — expositivo / argumentativo / ambos]
+
+INSTRUCCION AL AGENTE: Eres Sor Juana. Al recibir este mensaje, saluda al alumno por nombre, confirma sus subtemas, lee internamente las notas de cada subtema asignado y activa la Etapa A de inmediato. No repitas el proceso grupal.
+
+FIN DEL PROMPT HIJO
+────────────────────────────────────────
+
+## REGLAS GLOBALES
+- Si el equipo pide que generes los subtemas tu: aplica andamiaje, nunca cedes.
+- Si el equipo tiene menos de 7 subtemas: senalalo antes de evaluar.
+- Cierra cada fase con un resumen breve antes de avanzar.
+- Preguntas fuera del tema: 2 lineas maximo y redirige.
+
+---
+
+## CONTEXTO DE ESTA SESION (no modificar)
+Equipo: ${equipoNombre}
+Integrantes: ${lista}
+Fecha: ${fecha}`;
+}
+
+// ─── CSS ──────────────────────────────────────────────────────────────────────
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;0,600;0,700;0,900;1,400&family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -70,6 +185,7 @@ select.cc-input option{background:#FAF8F3;}
 .field{margin-bottom:14px;}
 `;
 
+// ─── UTILS ────────────────────────────────────────────────────────────────────
 function copyText(t) {
   if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(t).catch(() => execCopy(t));
   return execCopy(t);
@@ -78,24 +194,15 @@ function execCopy(t) {
   return new Promise((res, rej) => {
     try {
       const ta = document.createElement("textarea");
-      ta.value = t;
-      ta.style.cssText = "position:fixed;top:0;left:0;opacity:0;";
-      document.body.appendChild(ta);
-      ta.focus(); ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-      res();
+      ta.value = t; ta.style.cssText = "position:fixed;top:0;left:0;opacity:0;";
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      document.execCommand("copy"); document.body.removeChild(ta); res();
     } catch (e) { rej(e); }
   });
 }
-
-function riskC(r) {
-  if (r === "bajo")  return { dot: CC.verdeCuidado };
-  if (r === "medio") return { dot: CC.amarillo };
-  return                    { dot: CC.terracota };
-}
-function RiskDot({ r, s = 8 }) {
-  return <span style={{ display:"inline-block", width:s, height:s, borderRadius:"50%", background:riskC(r).dot, flexShrink:0 }} />;
+function riskDot(r) {
+  const c = r === "bajo" ? CC.verdeCuidado : r === "medio" ? CC.amarillo : CC.terracota;
+  return <span style={{ display:"inline-block", width:8, height:8, borderRadius:"50%", background:c, flexShrink:0 }} />;
 }
 function PhaseBar({ fase, dark = false }) {
   return (
@@ -106,7 +213,7 @@ function PhaseBar({ fase, dark = false }) {
         const lc = done ? (dark ? "rgba(244,239,230,0.55)" : CC.grisCiudad) : act ? (dark ? "#4A8BBE" : CC.azulNoche) : (dark ? "rgba(244,239,230,0.22)" : "#C8C3BA");
         return (
           <div key={f.n} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:3, flex:1 }}>
-            <div style={{ width:"100%", height:3, borderRadius:9999, background:bg, transition:"background 300ms" }} />
+            <div style={{ width:"100%", height:3, borderRadius:9999, background:bg }} />
             <span style={{ fontFamily:F.mono, fontSize:7, color:lc, letterSpacing:"0.06em", textTransform:"uppercase", lineHeight:1.1 }}>{f.label}</span>
           </div>
         );
@@ -116,9 +223,7 @@ function PhaseBar({ fase, dark = false }) {
 }
 function CopyBtn({ text, label = "Copiar", ghost = false }) {
   const [ok, setOk] = useState(false);
-  const go = () => copyText(text)
-    .then(() => { setOk(true); setTimeout(() => setOk(false), 2200); })
-    .catch(() => { setOk(true); setTimeout(() => setOk(false), 2200); });
+  const go = () => copyText(text).then(() => { setOk(true); setTimeout(() => setOk(false), 2200); }).catch(() => { setOk(true); setTimeout(() => setOk(false), 2200); });
   if (ghost) return <button onClick={go} className="btn-g" style={ok ? { borderColor:CC.verdeCuidado, color:CC.successTxt } : {}}>{ok ? "Copiado" : `Copiar ${label}`}</button>;
   return <button onClick={go} className="btn-p btn-t" style={ok ? { background:CC.verdeCuidado } : {}}>{ok ? "Copiado" : `Copiar ${label}`}</button>;
 }
@@ -141,10 +246,7 @@ function LoginScreen({ onLogin }) {
       });
       if (err || !data?.ok) { setError(data?.error || "Error de conexion"); setLoading(false); return; }
       onLogin(data);
-    } catch {
-      setError("Error de conexion. Verifica tu internet.");
-      setLoading(false);
-    }
+    } catch { setError("Error de conexion. Verifica tu internet."); setLoading(false); }
   }
 
   return (
@@ -169,11 +271,7 @@ function LoginScreen({ onLogin }) {
               <input className="cc-input" type="password" placeholder="Tu numero de matricula"
                 value={mat} onChange={e => setMat(e.target.value)} autoComplete="off" />
             </div>
-            {error && (
-              <div style={{ background:CC.errorBg, border:`1px solid ${CC.errorBd}`, borderRadius:6, padding:"9px 12px", fontFamily:F.mono, fontSize:9, color:CC.errorTxt, marginBottom:14 }}>
-                {error}
-              </div>
-            )}
+            {error && <div style={{ background:CC.errorBg, border:`1px solid ${CC.errorBd}`, borderRadius:6, padding:"9px 12px", fontFamily:F.mono, fontSize:9, color:CC.errorTxt, marginBottom:14 }}>{error}</div>}
             <button type="submit" className="btn-p btn-t" disabled={loading} style={{ width:"100%", fontSize:14, padding:"11px" }}>
               {loading ? "Verificando..." : "Entrar"}
             </button>
@@ -190,23 +288,17 @@ function LoginScreen({ onLogin }) {
 // ─── IDLE MODAL ───────────────────────────────────────────────────────────────
 function IdleModal({ user, onStay, onLeave }) {
   const [secs, setSecs] = useState(60);
-
   useEffect(() => {
     if (secs <= 0) { onLeave(); return; }
     const t = setTimeout(() => setSecs(p => p - 1), 1000);
     return () => clearTimeout(t);
   }, [secs]);
-
   return (
     <div className="modal-bg">
       <div className="modal" style={{ maxWidth:360, textAlign:"center", padding:40 }}>
         <div style={{ fontSize:48, marginBottom:14 }}>👋</div>
-        <div style={{ fontFamily:F.display, fontSize:28, fontWeight:700, color:CC.tinta, marginBottom:8 }}>
-          Sigues ahi?
-        </div>
-        <div style={{ fontFamily:F.display, fontSize:16, color:CC.grisCiudad, fontStyle:"italic", marginBottom:6 }}>
-          {user.nombre}
-        </div>
+        <div style={{ fontFamily:F.display, fontSize:28, fontWeight:700, color:CC.tinta, marginBottom:8 }}>Sigues ahi?</div>
+        <div style={{ fontFamily:F.display, fontSize:16, color:CC.grisCiudad, fontStyle:"italic", marginBottom:6 }}>{user.nombre}</div>
         <div style={{ fontFamily:F.mono, fontSize:10, color:CC.grisCiudad, marginBottom:30, lineHeight:1.6 }}>
           Tu sesion cerrara en{" "}
           <span style={{ color:CC.terracota, fontWeight:700, fontSize:13 }}>{secs}s</span>
@@ -214,9 +306,7 @@ function IdleModal({ user, onStay, onLeave }) {
         </div>
         <div style={{ display:"flex", gap:12, justifyContent:"center" }}>
           <button onClick={onLeave} className="btn-g" style={{ fontSize:13, padding:"9px 18px" }}>Salir</button>
-          <button onClick={onStay} className="btn-p btn-t" style={{ minWidth:170, fontSize:14, padding:"9px 20px" }}>
-            Si, continuo
-          </button>
+          <button onClick={onStay} className="btn-p btn-t" style={{ minWidth:170, fontSize:14, padding:"9px 20px" }}>Si, continuo</button>
         </div>
       </div>
     </div>
@@ -226,25 +316,22 @@ function IdleModal({ user, onStay, onLeave }) {
 // ─── HIPATIA MODAL ────────────────────────────────────────────────────────────
 function HipatiaModal({ user, onClose }) {
   const today = new Date().toISOString().split("T")[0];
-  const [members, setMembers]         = useState([{ nom:user.nomenclatura, nombre:user.nombre, loading:false, error:"" }]);
-  const [form, setForm]               = useState({ fecha:today, sesion:"Primera", retorno:"", ficha:"Si", asign:"Asignado" });
-  const [launched, setLaunched]       = useState(false);
-  const [creating, setCreating]       = useState(false);
-  const [errorEquipo, setErrorEquipo] = useState("");
-  const [existingTeam, setExistingTeam] = useState(null);
-  const [checkingTeam, setCheckingTeam] = useState(true);
-
+  const [members, setMembers]             = useState([{ nom:user.nomenclatura, nombre:user.nombre, loading:false, error:"", bloqueado:false }]);
+  const [form, setForm]                   = useState({ fecha:today, sesion:"Primera", retorno:"", ficha:"Si", asign:"Asignado" });
+  const [launched, setLaunched]           = useState(false);
+  const [creating, setCreating]           = useState(false);
+  const [errorEquipo, setErrorEquipo]     = useState("");
+  const [existingTeam, setExistingTeam]   = useState(null);
+  const [checkingTeam, setCheckingTeam]   = useState(true);
   const setF = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
+  // ── Detectar equipo existente al montar ──
   useEffect(() => {
     supabase.from("equipos")
       .select("*")
       .contains("integrantes", [user.nomenclatura])
       .maybeSingle()
-      .then(({ data }) => {
-        if (data) setExistingTeam(data);
-        setCheckingTeam(false);
-      });
+      .then(({ data }) => { if (data) setExistingTeam(data); setCheckingTeam(false); });
   }, []);
 
   useEffect(() => {
@@ -253,51 +340,56 @@ function HipatiaModal({ user, onClose }) {
     return () => window.removeEventListener("keydown", h);
   }, []);
 
+  // ── Buscar alumno + verificar si ya tiene equipo ──
   async function lookupMember(idx, nom) {
     if (nom.length !== 4) {
-      setMembers(p => p.map((m, i) => i === idx ? { ...m, nombre:"", error:"" } : m));
+      setMembers(p => p.map((m, i) => i === idx ? { ...m, nombre:"", error:"", bloqueado:false } : m));
       return;
     }
     setMembers(p => p.map((m, i) => i === idx ? { ...m, loading:true, error:"" } : m));
-    const { data } = await supabase.rpc("buscar_alumno", { p_nomenclatura: nom.toUpperCase() });
-    const alumno = data?.[0];
-    setMembers(p => p.map((m, i) => i === idx ? {
-      ...m, nombre: alumno?.nombre || "", loading: false,
-      error: alumno ? "" : "No encontrado: " + nom,
-    } : m));
+
+    const { data: alumnoData } = await supabase.rpc("buscar_alumno", { p_nomenclatura: nom.toUpperCase() });
+    const alumno = alumnoData?.[0];
+
+    if (!alumno) {
+      setMembers(p => p.map((m, i) => i === idx ? { ...m, nombre:"", loading:false, error:"No encontrado: " + nom, bloqueado:false } : m));
+      return;
+    }
+
+    // El alumno que inicia sesion ya sabemos que es valido
+    if (nom.toUpperCase() === user.nomenclatura) {
+      setMembers(p => p.map((m, i) => i === idx ? { ...m, nombre:alumno.nombre, loading:false, error:"", bloqueado:false } : m));
+      return;
+    }
+
+    // Verificar si ya pertenece a otro equipo
+    const { data: equipoData } = await supabase.rpc("buscar_equipo_alumno", { p_nomenclatura: nom.toUpperCase() });
+    if (equipoData?.tieneEquipo) {
+      setMembers(p => p.map((m, i) => i === idx ? {
+        ...m,
+        nombre:   alumno.nombre,
+        loading:  false,
+        error:    `Alumno no disponible (equipo: ${equipoData.equipoNombre})`,
+        bloqueado: true,
+      } : m));
+      return;
+    }
+
+    setMembers(p => p.map((m, i) => i === idx ? { ...m, nombre:alumno.nombre, loading:false, error:"", bloqueado:false } : m));
   }
 
-  const addMember    = () => { if (members.length < 7) setMembers(p => [...p, { nom:"", nombre:"", loading:false, error:"" }]); };
+  const addMember    = () => { if (members.length < 7) setMembers(p => [...p, { nom:"", nombre:"", loading:false, error:"", bloqueado:false }]); };
   const removeMember = idx => setMembers(p => p.filter((_, i) => i !== idx));
   const updateMember = (idx, nom) => {
     setMembers(p => p.map((m, i) => i === idx ? { ...m, nom: nom.toUpperCase() } : m));
     if (nom.length === 4) lookupMember(idx, nom);
   };
 
-  const validMembers = members.filter(m => m.nombre && !m.error);
+  // Solo integrantes con nombre, sin error y sin bloqueo
+  const validMembers = members.filter(m => m.nombre && !m.error && !m.bloqueado);
   const canCreate    = validMembers.length >= 2;
 
-  function buildPrompt(equipoNombre) {
-    const integrantes = validMembers.map(m => m.nombre).join(", ");
-    const extra = form.sesion === "Retorno" && form.retorno ? ` - ${form.retorno}` : "";
-    return `Hipatia, iniciamos una sesion grupal.
-
-- Fecha: ${form.fecha}
-- Grupo: ${user.grupo}
-- Equipo: ${equipoNombre}
-- Integrantes: ${integrantes} (${validMembers.length} miembros)
-- Sesion: ${form.sesion}${extra}
-- Ficha II visible: ${form.ficha}
-- Tema: ${form.asign}
-
-CRITERIOS QUE EL DOCENTE PRIORIZARA:
-- Fenomeno fisico concreto y medible, no generico.
-- Subtemas 5-7 con postura argumentativa real, no descriptiva.
-- Al menos un subtema expositivo y uno argumentativo por alumno.
-
-INSTRUCCION DE ARRANQUE: Confirma los datos, saluda al equipo con calidez y pide los datos de la Parte A.`;
-  }
-
+  // ── Crear equipo (solo una vez) y copiar system prompt ──
   async function handleGo() {
     if (!canCreate) return;
     setCreating(true); setErrorEquipo("");
@@ -308,18 +400,20 @@ INSTRUCCION DE ARRANQUE: Confirma los datos, saluda al equipo con calidez y pide
       p_tema:     "",
       p_fenomeno: "",
     });
-    if (data?.ok === false) {
-      setErrorEquipo(data.error || "Error al crear el equipo");
+    if (!data?.ok) {
+      setErrorEquipo(data?.error || "Error al crear el equipo");
       setCreating(false);
       return;
     }
     setCreating(false);
-    const equipoNombre = data?.nombreEquipo || "Equipo";
-    window.open(HIPATIA_URL, "_blank");
+    const equipoNombre = data.nombreEquipo || "Equipo";
+    // Si el RPC devolvio el equipo existente, actualizar estado
+    if (data.existente) setExistingTeam(data);
+    copyText(buildSystemPrompt(equipoNombre, validMembers)).catch(console.error);
     setLaunched(true);
-    copyText(buildPrompt(equipoNombre)).catch(console.error);
   }
 
+  // ── Pantalla de carga ──
   if (checkingTeam) {
     return (
       <div className="modal-bg">
@@ -330,6 +424,7 @@ INSTRUCCION DE ARRANQUE: Confirma los datos, saluda al equipo con calidez y pide
     );
   }
 
+  // ── Alumno ya tiene equipo: mostrar info + copiar system prompt ──
   if (existingTeam) {
     return (
       <div className="modal-bg" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -347,35 +442,42 @@ INSTRUCCION DE ARRANQUE: Confirma los datos, saluda al equipo con calidez y pide
               <div key={i} style={{ fontFamily:F.body, fontSize:13, color:CC.tinta, padding:"4px 0", borderBottom: i < existingTeam.integrantes.length - 1 ? `1px solid ${CC.grisPapel}` : "none" }}>{nom}</div>
             ))}
           </div>
-          {!existingTeam.prompt_hijo && (
-            <div style={{ background:CC.warningBg, border:`1px solid ${CC.warningBd}`, borderRadius:6, padding:"9px 12px", fontFamily:F.mono, fontSize:9, color:CC.warningTxt, marginBottom:16 }}>
-              El equipo aun no tiene Prompt Hijo. Completa la sesion grupal con Hipatia.
+          <div style={{ background:CC.successBg, border:`1px solid ${CC.successBd}`, borderRadius:8, padding:"12px 14px", marginBottom:20 }}>
+            <div style={{ fontFamily:F.mono, fontSize:9, color:CC.successTxt, letterSpacing:"0.06em", textTransform:"uppercase", marginBottom:4 }}>Como usar Hipatia</div>
+            <div style={{ fontFamily:F.body, fontSize:12, color:CC.successTxt, lineHeight:1.6 }}>
+              Copia el System Prompt de Hipatia y pegalo como primer mensaje en ChatGPT, Claude, Gemini o cualquier IA. Hipatia te guiara desde ahi.
             </div>
-          )}
+          </div>
           <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
             <button onClick={onClose} className="btn-g">Cerrar</button>
-            {existingTeam.prompt_hijo && (
-              <button onClick={() => { window.open(HIPATIA_URL, "_blank"); copyText(existingTeam.prompt_hijo).catch(console.error); }} className="btn-p btn-t">
-                Copiar prompt e ir a Hipatia
-              </button>
-            )}
+            <CopyBtn
+              text={buildSystemPrompt(existingTeam.nombre, existingTeam.integrantes || [])}
+              label="System Prompt de Hipatia"
+            />
           </div>
         </div>
       </div>
     );
   }
 
+  // ── Modal principal: nuevo equipo ──
   return (
     <div className="modal-bg" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:22, paddingBottom:16, borderBottom:`1px solid ${CC.grisPapel}` }}>
           <div>
             <div style={{ fontFamily:F.display, fontSize:24, fontWeight:700, color:CC.tinta }}>Hipatia</div>
-            <div style={{ fontFamily:F.mono, fontSize:9, color:CC.grisCiudad, marginTop:3, letterSpacing:"0.06em", textTransform:"uppercase" }}>Sesion grupal</div>
+            <div style={{ fontFamily:F.mono, fontSize:9, color:CC.grisCiudad, marginTop:3, letterSpacing:"0.06em", textTransform:"uppercase" }}>Sesion grupal · Registrar equipo</div>
           </div>
           <button onClick={onClose} className="btn-g" style={{ padding:"4px 10px" }}>✕</button>
         </div>
 
+        {/* Instruccion */}
+        <div style={{ background:CC.infoBg, border:`1px solid ${CC.infoBd}`, borderRadius:6, padding:"9px 12px", fontFamily:F.body, fontSize:12, color:CC.azulNoche, marginBottom:18, lineHeight:1.6 }}>
+          Registra tu equipo una sola vez. Al confirmar, copiaras el System Prompt de Hipatia para pegarlo en cualquier IA (ChatGPT, Claude, Gemini...).
+        </div>
+
+        {/* Integrantes */}
         <div style={{ marginBottom:20 }}>
           <div style={{ fontFamily:F.mono, fontSize:9, color:CC.azulNoche, letterSpacing:"0.07em", textTransform:"uppercase", marginBottom:12 }}>Integrantes del equipo</div>
           {members.map((m, i) => (
@@ -384,13 +486,16 @@ INSTRUCCION DE ARRANQUE: Confirma los datos, saluda al equipo con calidez y pide
                 {i === 0 && <label className="cc-label">Nomenclatura</label>}
                 <input className="cc-input" placeholder="ej. 2B12" maxLength={4}
                   value={m.nom} onChange={e => updateMember(i, e.target.value)}
-                  style={{ borderColor: m.error ? CC.terracota : m.nombre ? CC.verdeCuidado : "" }} />
+                  disabled={i === 0}
+                  style={{ borderColor: m.bloqueado ? CC.terracota : m.error ? CC.terracota : m.nombre && !m.error ? CC.verdeCuidado : "", opacity: i === 0 ? 0.7 : 1 }} />
               </div>
               <div>
                 {i === 0 && <label className="cc-label">Nombre</label>}
-                <div style={{ padding:"10px 12px", background:CC.papelSecund, borderRadius:4, fontFamily:F.body, fontSize:13, minHeight:40, display:"flex", alignItems:"center",
-                  color: m.loading ? CC.grisCiudad : m.error ? CC.errorTxt : m.nombre ? CC.tinta : CC.grisCiudad }}>
-                  {m.loading ? "Buscando..." : m.error || m.nombre || "—"}
+                <div style={{
+                  padding:"10px 12px", background:CC.papelSecund, borderRadius:4, fontFamily:F.body, fontSize:12, minHeight:40, display:"flex", alignItems:"center",
+                  color: m.loading ? CC.grisCiudad : m.bloqueado ? CC.errorTxt : m.error ? CC.errorTxt : m.nombre ? CC.tinta : CC.grisCiudad
+                }}>
+                  {m.loading ? "Buscando..." : m.error ? m.error : m.nombre || "—"}
                 </div>
               </div>
               {i > 0
@@ -407,12 +512,13 @@ INSTRUCCION DE ARRANQUE: Confirma los datos, saluda al equipo con calidez y pide
           {canCreate && <div style={{ fontFamily:F.mono, fontSize:9, color:CC.successTxt, marginTop:8 }}>✓ {validMembers.length} integrantes confirmados</div>}
         </div>
 
+        {/* Campos */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:20 }}>
           {[
             { k:"fecha",  l:"Fecha",        type:"date" },
-            { k:"sesion", l:"Sesion",       type:"sel",  opts:["Primera","Retorno"] },
+            { k:"sesion", l:"Sesion",       type:"sel", opts:["Primera","Retorno"] },
             { k:"ficha",  l:"Ficha visible", type:"sel", opts:["Si","No"] },
-            { k:"asign",  l:"Tema",         type:"sel",  opts:["Asignado","Elegido por el equipo"] },
+            { k:"asign",  l:"Tema",         type:"sel", opts:["Asignado","Elegido por el equipo"] },
           ].map(({ k, l, type, opts }) => (
             <div key={k} className="field" style={{ marginBottom:0 }}>
               <label className="cc-label">{l}</label>
@@ -427,8 +533,7 @@ INSTRUCCION DE ARRANQUE: Confirma los datos, saluda al equipo con calidez y pide
           {form.sesion === "Retorno" && (
             <div className="field" style={{ gridColumn:"1/-1", marginBottom:0 }}>
               <label className="cc-label">En que fase quedaron?</label>
-              <input className="cc-input" placeholder="ej. Fase 2, subtemas pendientes"
-                value={form.retorno} onChange={e => setF("retorno", e.target.value)} />
+              <input className="cc-input" placeholder="ej. Fase 2, subtemas pendientes" value={form.retorno} onChange={e => setF("retorno", e.target.value)} />
             </div>
           )}
         </div>
@@ -440,16 +545,15 @@ INSTRUCCION DE ARRANQUE: Confirma los datos, saluda al equipo con calidez y pide
         )}
         {!canCreate && (
           <div style={{ background:CC.warningBg, border:`1px solid ${CC.warningBd}`, borderRadius:6, padding:"9px 12px", fontFamily:F.mono, fontSize:9, color:CC.warningTxt, marginBottom:14 }}>
-            Se necesitan minimo 2 integrantes validos
+            Se necesitan minimo 2 integrantes validos (sin equipo previo)
           </div>
         )}
 
         <div style={{ display:"flex", gap:10, justifyContent:"flex-end", alignItems:"center" }}>
-          {launched && <span style={{ fontFamily:F.mono, fontSize:9, color:CC.successTxt }}>Copiado — abriendo Hipatia...</span>}
+          {launched && <span style={{ fontFamily:F.mono, fontSize:9, color:CC.successTxt }}>System Prompt copiado — pega en cualquier IA</span>}
           <button onClick={onClose} className="btn-g">Cancelar</button>
-          <button onClick={handleGo} disabled={!canCreate || creating} className="btn-p btn-t"
-            style={{ opacity: canCreate && !creating ? 1 : 0.4 }}>
-            {creating ? "Creando equipo..." : launched ? "Listo" : "Copiar y abrir Hipatia"}
+          <button onClick={handleGo} disabled={!canCreate || creating} className="btn-p btn-t" style={{ opacity: canCreate && !creating ? 1 : 0.4 }}>
+            {creating ? "Registrando..." : launched ? "Listo" : "Registrar equipo y copiar Hipatia"}
           </button>
         </div>
       </div>
@@ -470,10 +574,9 @@ function SorJuanaModal({ user, onClose }) {
 
   function selectEquipo(eq) {
     setEquipo(eq);
-    const subs  = Array.isArray(eq.subtemas) ? eq.subtemas : [];
-    const mine  = subs.filter(s => s.alumno === user.nomenclatura);
-    const nums  = mine.length > 0 ? mine.map(s => s.n).filter(n => typeof n === "number") : [];
-    setSubtemas(nums);
+    const subs = Array.isArray(eq.subtemas) ? eq.subtemas : [];
+    const mine = subs.filter(s => s.alumno === user.nomenclatura);
+    setSubtemas(mine.length > 0 ? mine.map(s => s.n).filter(n => typeof n === "number") : []);
   }
 
   useEffect(() => {
@@ -495,9 +598,9 @@ function SorJuanaModal({ user, onClose }) {
 
   function buildPrompt() {
     if (!equipo) return "";
-    const subStr  = subtemas.length > 0 ? "Subtemas " + subtemas.join(" y ") : "[seleccionar]";
-    const retStr  = sesion === "2" ? (retorno || "Si") : "No";
-    const ph      = equipo.prompt_hijo || "[Prompt Hijo pendiente — completa primero la sesion grupal con Hipatia]";
+    const subStr = subtemas.length > 0 ? "Subtemas " + subtemas.join(" y ") : "[seleccionar]";
+    const retStr = sesion === "2" ? (retorno || "Si") : "No";
+    const ph = equipo.prompt_hijo || "[Prompt Hijo pendiente — completa primero la sesion grupal con Hipatia]";
     return `Sor Juana, inicio mi sesion individual.
 - Numero de sesion: ${sesion}
 - Retomas sesion anterior: ${retStr}
@@ -544,8 +647,8 @@ Tipo de texto: ${tipo}`;
                 <button key={eq.id} onClick={() => selectEquipo(eq)} style={{
                   padding:"7px 14px", borderRadius:6, cursor:"pointer", fontFamily:F.body, fontSize:13, fontWeight:500,
                   background: equipo?.id === eq.id ? CC.infoBg : "#FAF8F3",
-                  border:     `1px solid ${equipo?.id === eq.id ? CC.azulNoche : CC.grisPapel}`,
-                  color:      equipo?.id === eq.id ? CC.azulNoche : CC.tinta,
+                  border: `1px solid ${equipo?.id === eq.id ? CC.azulNoche : CC.grisPapel}`,
+                  color: equipo?.id === eq.id ? CC.azulNoche : CC.tinta,
                   display:"flex", alignItems:"center", gap:7,
                 }}>
                   {eq.nombre}
@@ -570,8 +673,8 @@ Tipo de texto: ${tipo}`;
                       style={{
                         padding:"5px 10px", borderRadius:4, cursor:"pointer", fontFamily:F.mono, fontSize:10,
                         background: sel ? (ts==="exp" ? "rgba(23,50,77,0.08)" : "rgba(107,90,142,0.08)") : "#FAF8F3",
-                        border:     `1px solid ${sel ? (ts==="exp" ? CC.azulNoche : "#6B5A8E") : CC.grisPapel}`,
-                        color:      sel ? (ts==="exp" ? CC.azulNoche : "#6B5A8E") : CC.grisCiudad,
+                        border: `1px solid ${sel ? (ts==="exp" ? CC.azulNoche : "#6B5A8E") : CC.grisPapel}`,
+                        color: sel ? (ts==="exp" ? CC.azulNoche : "#6B5A8E") : CC.grisCiudad,
                       }}>
                       S{n} <span style={{ fontSize:8, opacity:0.6 }}>{ts}</span>
                     </button>
@@ -599,8 +702,7 @@ Tipo de texto: ${tipo}`;
               {sesion === "2" && (
                 <div className="field" style={{ gridColumn:"1/-1", marginBottom:0 }}>
                   <label className="cc-label">En que subtema y etapa quedaste?</label>
-                  <input className="cc-input" placeholder="ej. Subtema 5, inicio Iteracion 2"
-                    value={retorno} onChange={e => setRetorno(e.target.value)} />
+                  <input className="cc-input" placeholder="ej. Subtema 5, inicio Iteracion 2" value={retorno} onChange={e => setRetorno(e.target.value)} />
                 </div>
               )}
             </div>
@@ -653,15 +755,15 @@ function StudentPortal({ user, sesionActiva, onLogout }) {
 
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, marginBottom:48 }}>
         {[
-          { key:"hipatia",  name:"Hipatia",   italic:false, tag:"Sesion grupal",      desc:"Organiza tu proyecto y obtén el Prompt Hijo de tu equipo.", activa:hipActiva },
-          { key:"sorjuana", name:"Sor Juana",  italic:true,  tag:"Sesion individual", desc:"Encuentra fuentes y elabora tus fichas de trabajo con acompañamiento.", activa:sorActiva },
+          { key:"hipatia",  name:"Hipatia",  italic:false, tag:"Sesion grupal",      desc:"Registra tu equipo y obtén el System Prompt de Hipatia para trabajar en cualquier IA.", activa:hipActiva },
+          { key:"sorjuana", name:"Sor Juana", italic:true, tag:"Sesion individual", desc:"Encuentra fuentes y elabora tus fichas de trabajo con acompañamiento personalizado.", activa:sorActiva },
         ].map(ag => (
           <div key={ag.key} style={{
             background: ag.activa ? CC.papelBlanco : "#EDE8DF",
-            border:     `1.5px solid ${ag.activa ? CC.grisPapel : "#DDD8CF"}`,
+            border: `1.5px solid ${ag.activa ? CC.grisPapel : "#DDD8CF"}`,
             borderRadius:12, padding:"22px 22px 18px",
-            boxShadow:  ag.activa ? CC.shadowSm : "none",
-            opacity:    ag.activa ? 1 : 0.5,
+            boxShadow: ag.activa ? CC.shadowSm : "none",
+            opacity: ag.activa ? 1 : 0.5,
           }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
               <div style={{ fontFamily:F.display, fontSize:26, fontWeight:700, color: ag.activa ? CC.tinta : "#9A9590", fontStyle: ag.italic ? "italic" : "normal", lineHeight:1.1 }}>{ag.name}</div>
@@ -673,7 +775,7 @@ function StudentPortal({ user, sesionActiva, onLogout }) {
             <div style={{ fontFamily:F.body, fontSize:12, color:CC.grisCiudad, lineHeight:1.65, marginBottom:18 }}>{ag.desc}</div>
             <button onClick={() => ag.activa && setModal(ag.key)} disabled={!ag.activa}
               className="btn-p btn-t" style={{ width:"100%", opacity: ag.activa ? 1 : 0.35, fontSize:13, padding:"9px" }}>
-              Preparar y abrir {ag.name}
+              {ag.key === "hipatia" ? "Registrar equipo y copiar Hipatia" : "Preparar y abrir Sor Juana"}
             </button>
           </div>
         ))}
@@ -785,27 +887,19 @@ function TeacherPortal({ lastUpdate }) {
           <button key={g} onClick={() => setFg(g)} style={{
             padding:"4px 11px", borderRadius:3, cursor:"pointer", fontFamily:F.body, fontSize:12, fontWeight:500,
             background: fg === g ? CC.terracota : "transparent",
-            border:     `1px solid ${fg === g ? CC.terracota : "#444"}`,
-            color:      fg === g ? CC.papel : "rgba(244,239,230,0.55)",
+            border: `1px solid ${fg === g ? CC.terracota : "#444"}`,
+            color: fg === g ? CC.papel : "rgba(244,239,230,0.55)",
           }}>{g}</button>
         ))}
-        {lastUpdate && (
-          <div style={{ marginLeft:"auto", fontFamily:F.mono, fontSize:8, ...M }}>
-            Actualizado: {lastUpdate.toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"})}
-          </div>
-        )}
+        {lastUpdate && <div style={{ marginLeft:"auto", fontFamily:F.mono, fontSize:8, ...M }}>Actualizado: {lastUpdate.toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"})}</div>}
       </div>
 
       <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-        {eqs.length === 0 && !loading && (
-          <div style={{ fontFamily:F.mono, fontSize:10, ...M, padding:20, textAlign:"center" }}>
-            No hay equipos en {fg === "Todos" ? "ningun grupo" : fg}
-          </div>
-        )}
+        {eqs.length === 0 && !loading && <div style={{ fontFamily:F.mono, fontSize:10, ...M, padding:20, textAlign:"center" }}>No hay equipos en {fg === "Todos" ? "ningun grupo" : fg}</div>}
         {eqs.map(eq => {
           const subs   = Array.isArray(eq.subtemas) ? eq.subtemas : [];
-          const listas = subs.reduce((a,s) => a + (s.fichasListas || 0), 0);
-          const total  = subs.reduce((a,s) => a + (s.fichasTotal  || 3), 0) || 21;
+          const listas = subs.reduce((a, s) => a + (s.fichasListas || 0), 0);
+          const total  = subs.reduce((a, s) => a + (s.fichasTotal  || 3), 0) || 21;
           const ra     = subs.filter(s => s.riesgo === "alto").length;
           const pct    = Math.round(listas / total * 100);
           const isExp  = exp === eq.id;
@@ -831,7 +925,7 @@ function TeacherPortal({ lastUpdate }) {
                 <div style={{ display:"flex", flexDirection:"column", gap:3, alignItems:"flex-end" }}>
                   {ra > 0 && (
                     <div style={{ display:"flex", alignItems:"center", gap:3 }}>
-                      <RiskDot r="alto" s={6} />
+                      {riskDot("alto")}
                       <span style={{ fontFamily:F.mono, fontSize:7, color:CC.terracota }}>{ra} alto{ra>1?"s":""}</span>
                     </div>
                   )}
@@ -861,7 +955,7 @@ function TeacherPortal({ lastUpdate }) {
                             <span style={{ fontFamily:F.mono, fontSize:7, ...M }}>{s.fichasListas||0}/{s.fichasTotal||3}</span>
                           </div>
                           <div style={{ display:"flex", alignItems:"center", gap:5 }}>
-                            <RiskDot r={s.riesgo||"bajo"} s={6} />
+                            {riskDot(s.riesgo||"bajo")}
                             <span style={{ fontFamily:F.mono, fontSize:7, color:"rgba(244,239,230,0.38)", lineHeight:1.4 }}>{s.nota||""}</span>
                           </div>
                         </div>
@@ -885,11 +979,11 @@ function TeacherPortal({ lastUpdate }) {
 
 // ─── APP ROOT ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [user, setUser]               = useState(null);
-  const [view, setView]               = useState("student");
-  const [sesionActiva, setSesionActiva] = useState("ambas");
-  const [lastUpdate, setLastUpdate]   = useState(null);
-  const [showIdle, setShowIdle]       = useState(false);
+  const [user, setUser]                   = useState(null);
+  const [view, setView]                   = useState("student");
+  const [sesionActiva, setSesionActiva]   = useState("ambas");
+  const [lastUpdate, setLastUpdate]       = useState(null);
+  const [showIdle, setShowIdle]           = useState(false);
   const idleRef = useRef(null);
 
   const resetIdle = useCallback(() => {
@@ -955,8 +1049,8 @@ export default function App() {
             <button key={v.k} onClick={() => setView(v.k)} style={{
               padding:"5px 12px", borderRadius:4, cursor:"pointer", fontFamily:F.body, fontSize:11, fontWeight:500,
               background: view===v.k ? CC.terracota : "transparent",
-              border:     `1px solid ${view===v.k ? CC.terracota : "rgba(244,239,230,0.15)"}`,
-              color:      view===v.k ? CC.papel : "rgba(244,239,230,0.50)",
+              border: `1px solid ${view===v.k ? CC.terracota : "rgba(244,239,230,0.15)"}`,
+              color: view===v.k ? CC.papel : "rgba(244,239,230,0.50)",
             }}>{v.l}</button>
           ))}
         </nav>
