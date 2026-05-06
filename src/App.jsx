@@ -173,7 +173,27 @@ function HipatiaModal({user,onClose}){
   const[creating,setCreating]=useState(false);
   const setF=(k,v)=>setForm(p=>({...p,[k]:v}));
   const[errorEquipo,setErrorEquipo]=useState("");
+const detectarEquipoDelAlumno = async (alumnoId) => {
+  const { data, error } = await supabase
+    .from("integrantes")
+    .select(`
+      equipo_id,
+      equipos (
+        id,
+        nombre,
+        prompt
+      )
+    `)
+    .eq("alumno_id", alumnoId)
+    .single();
 
+  if (error) {
+    console.log("Alumno sin equipo aún");
+    return null;
+  }
+
+  return data.equipos;
+};
 const lookupMember = async(idx, nom) => {
   if(nom.length !== 4){
     setMembers(p=>p.map((m,i)=>
