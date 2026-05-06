@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js"
+import { useState, useEffect, useRef, useCallback } from "react";
+import { createClient } from "@supabase/supabase-js";
 // ─── SUPABASE ─────────────────────────────────────────────────────────────────
 const SUPA_URL = "https://pmlrqzviwjnfwowdhjiy.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtbHJxenZpd2puZndvd2Roaml5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwMDA5NTYsImV4cCI6MjA5MzU3Njk1Nn0.Ys_JFKJ-1jnxr70ssRtlNxxREClgVIJQ8GxcI4gIVRE";
@@ -10,6 +10,7 @@ const HIPATIA_URL = "https://m365.cloud.microsoft/chat/?titleId=T_9b1c72cd-8ffb-
 const SORJUANA_URL = "https://m365.cloud.microsoft/chat/?titleId=T_87e151b4-d92c-6ec5-985a-0e66bad65f0d&source";
 const TEACHER_PASSWORD = "Hipatia26";
 const FETCH_INTERVAL = 30000;
+const IDLE_MS = 10 * 60 * 1000; // 10 min sin actividad → ¿Sigues ahí?
 
 // ─── LOGOS (base64) ───────────────────────────────────────────────────────────
 const LOGOS = {
@@ -163,9 +164,48 @@ function LoginScreen({onLogin}){
     </div>
   );
 }
-
+// ─── IDLE MODAL ───────────────────────────────────────────────────────────────
+function IdleModal({user,onStay,onLeave}){
+  const[secs,setSecs]=useState(60);
+  useEffect(()=>{
+    if(secs<=0){onLeave();return;}
+    const t=setTimeout(()=>setSecs(p=>p-1),1000);
+    return()=>clearTimeout(t);
+  },[secs]);
+  return(
+    <div className="modal-bg">
+      <div className="modal" style={{maxWidth:360,textAlign:"center",padding:40}}>
+        <div style={{fontSize:48,marginBottom:14}}>👋</div>
+        <div style={{fontFamily:F.display,fontSize:28,fontWeight:700,color:CC.tinta,
+          letterSpacing:"-0.02em",lineHeight:1.1,marginBottom:8}}>
+          ¿Sigues ahí?
+        </div>
+        <div style={{fontFamily:F.display,fontSize:16,fontWeight:400,color:CC.grisCiudad,
+          fontStyle:"italic",marginBottom:6}}>
+          {user.nombre}
+        </div>
+        <div style={{fontFamily:F.mono,fontSize:10,color:CC.grisCiudad,
+          marginBottom:30,letterSpacing:"0.04em",lineHeight:1.6}}>
+          Tu sesión cerrará en{" "}
+          <span style={{color:CC.terracota,fontWeight:700,fontSize:13}}>{secs}s</span>
+          {" "}si no hay actividad
+        </div>
+        <div style={{display:"flex",gap:12,justifyContent:"center"}}>
+          <button onClick={onLeave} className="btn-g"
+            style={{fontSize:13,padding:"9px 18px"}}>
+            Salir
+          </button>
+          <button onClick={onStay} className="btn-p btn-t"
+            style={{minWidth:170,fontSize:14,padding:"9px 20px"}}>
+            Sí, continúo 👍
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 // ─── HIPATIA MODAL ────────────────────────────────────────────────────────────
-function HipatiaModal({user,onClose}){
+root({user,onClose}){
   const today=new Date().toISOString().split("T")[0];
   const[members,setMembers]=useState([{nom:user.nomenclatura,nombre:user.nombre,loading:false,error:""}]);
   const[form,setForm]=useState({fecha:today,sesion:"Primera",retorno:"",ficha:"Sí",asign:"Asignado"});
@@ -707,17 +747,48 @@ export default function App(){
   const[view,setView]=useState("student");
   const[sesionActiva,setSesionActiva]=useState("ambas");
   const[lastUpdate,setLastUpdate]=useState(null);
+  const[showIdle,setShowIdle]=useState(false);
+  const idleRef=useRef(null);
+
+  const resetIdle=useCallback(()=>{
+    clearTimeout(idleRef.current);
+    idleRef.current=setTimeout(()=>setShowIdle(true),IDLE_MS);
+  },[]);
+
+  useEffect(()=>{
+    if(!user){clearTimeout(idleRef.current);setShowIdle(false);return;}
+    const evts=['mousemove','keydown','click','scroll','touchstart'];
+    evts.forEach(e=>window.addEventListener(e,resetIdle,{passive:true}));
+    resetIdle();
+    return()=>{
+      evts.forEach(e=>window.removeEventListener(e,resetIdle));
+      clearTimeout(idleRef.current);
+    };
+  },[user,resetIdle]);
 
   useEffect(()=>{
     supabase.from("config").select("valor").eq("clave","sesion_activa").single()
       .then(({data})=>{if(data?.valor)setSesionActiva(data.valor);});
     const t=setInterval(async()=>{
-      const{data}=await supabase.from("config").select("valor").eq("clave","sesion_activa").single();
+      const{data}=await supabase.from("config").select("valor")
+        .eq("clave","sesion_activa").single();
       if(data?.valor)setSesionActiva(data.valor);
       setLastUpdate(new Date());
     },FETCH_INTERVAL);
     return()=>clearInterval(t);
   },[]);
+
+  const handleLogout=()=>{
+    setUser(null);
+    setView("student");
+    setShowIdle(false);
+    clearTimeout(idleRef.current);
+  };
+
+  const handleStay=()=>{
+    setShowIdle(false);
+    resetIdle();
+  };
 
   if(!user&&view==="student") return(
     <>
@@ -728,129 +799,116 @@ export default function App(){
 
   const isDark=view==="teacher";
   return(
-    <div style={{minHeight:"100vh",background:isDark?CC.tinta:CC.papel,transition:"background 300ms"}}>
+    <div style={{minHeight:"100vh",background:isDark?CC.tinta:CC.papel,
+      transition:"background 300ms"}}>
       <style>{CSS}</style>
-    <header style={{position:"sticky",top:0,zIndex:100,background:CC.tinta,
-  borderBottom:`1px solid ${CC.tintaBorde}`,display:"flex",
-  alignItems:"center",padding:"0 16px",gap:12,minHeight:60}}>
 
-  {/* ── Logos institucionales izquierda ── */}
-  <div style={{display:"flex",alignItems:"center",gap:6,
-    paddingRight:12,borderRight:`1px solid rgba(244,239,230,0.08)`}}>
-    <div style={{background:"rgba(255,255,255,0.07)",borderRadius:5,
-      padding:"3px 5px",display:"flex",alignItems:"center"}}>
-      <img src={LOGOS.lasalle}
-        alt="Colegio Regiomontano Contry La Salle"
-        style={{height:32,objectFit:"contain",display:"block"}}/>
-    </div>
-    <div style={{background:"rgba(255,255,255,0.07)",borderRadius:5,
-      padding:"3px 5px",display:"flex",alignItems:"center"}}>
-      <img src={LOGOS.unesco}
-        alt="UNESCO Escuelas Asociadas"
-        style={{height:28,objectFit:"contain",display:"block"}}/>
-    </div>
-  </div>
-
-  {/* ── Marca Casa Colectiva ── */}
-  <div style={{flex:1}}>
-    <div style={{display:"flex",alignItems:"center",gap:7}}>
-      <img src={LOGOS.cc_iso} alt="cc" style={{height:20}}/>
-      <img src={LOGOS.cc_word} alt="Casa Colectiva"
-        style={{height:14,filter:"brightness(0) invert(1)",opacity:0.85}}/>
-      <span style={{fontFamily:F.mono,fontSize:7,
-        color:"rgba(244,239,230,0.28)",
-        letterSpacing:"0.10em",textTransform:"uppercase"}}>
-        · Ficha II · Marco teórico
-      </span>
-    </div>
-    <div style={{fontFamily:F.mono,fontSize:7,marginTop:1,marginLeft:27,
-      color:"rgba(244,239,230,0.22)",letterSpacing:"0.07em",
-      textTransform:"uppercase"}}>
-      Colegio Regiomontano Contry La Salle · 2° Secundaria
-    </div>
-  </div>
-
-  {/* ── Nav ── */}
-  <nav style={{display:"flex",gap:4}}>
-    {user&&[{k:"student",l:"Alumnos"},{k:"teacher",l:"Docente"}].map(v=>(
-      <button key={v.k} onClick={()=>setView(v.k)} style={{
-        padding:"5px 12px",borderRadius:4,cursor:"pointer",
-        fontFamily:F.body,fontSize:11,fontWeight:500,
-        background:view===v.k?CC.terracota:"transparent",
-        border:`1px solid ${view===v.k?CC.terracota:"rgba(244,239,230,0.15)"}`,
-        color:view===v.k?CC.papel:"rgba(244,239,230,0.50)",
-        transition:"all 180ms"}}>{v.l}</button>
-    ))}
-  </nav>
-</header>
-
-      {view==="student"&&user&&<StudentPortal user={user} sesionActiva={sesionActiva} onLogout={()=>{setUser(null);setView("student");}}/>}
-      {view==="teacher"&&<TeacherPortal lastUpdate={lastUpdate}/>}
-
-     <footer style={{borderTop:`1px solid ${isDark?CC.tintaBorde:CC.grisPapel}`,marginTop:44}}>
-
-  {/* ── Logos institucionales ── */}
-  <div style={{background:CC.papelBlanco,padding:"14px 24px",
-    display:"flex",alignItems:"center",
-    justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
-    <img src={LOGOS.lasalle}
-      alt="Colegio Regiomontano Contry La Salle"
-      style={{height:42,objectFit:"contain"}}/>
-    <img src={LOGOS.unesco}
-      alt="UNESCO Escuelas Asociadas"
-      style={{height:38,objectFit:"contain",opacity:0.80,
-        filter:"grayscale(20%)"}}/>
-  </div>
-
-  {/* ── Derechos e imagen institucional CC ── */}
-  <div style={{background:isDark?CC.tinta:"#EDE8DF",padding:"14px 24px"}}>
-    <div style={{display:"flex",alignItems:"center",
-      justifyContent:"space-between",flexWrap:"wrap",
-      gap:10,marginBottom:10}}>
-      <div style={{display:"flex",alignItems:"center",gap:8}}>
-        <img src={LOGOS.cc_iso} alt="cc"
-          style={{height:24,opacity:0.65}}/>
-        <div>
-          <div style={{display:"flex",alignItems:"center",gap:6}}>
-            <img src={LOGOS.cc_word} alt="Casa Colectiva"
-              style={{height:13,opacity:0.55,
-                filter:isDark?"brightness(0) invert(1)":"none"}}/>
-            <span style={{fontFamily:F.mono,fontSize:7,letterSpacing:"0.07em",
-              textTransform:"uppercase",
-              color:isDark?"rgba(244,239,230,0.22)":"#9A9590"}}>
-              © 2026 · Todos los derechos reservados
-            </span>
+      <header style={{position:"sticky",top:0,zIndex:100,background:CC.tinta,
+        borderBottom:`1px solid ${CC.tintaBorde}`,display:"flex",
+        alignItems:"center",padding:"0 16px",gap:12,minHeight:60}}>
+        <div style={{display:"flex",alignItems:"center",gap:6,paddingRight:12,
+          borderRight:"1px solid rgba(244,239,230,0.08)"}}>
+          <div style={{background:"rgba(255,255,255,0.07)",borderRadius:5,
+            padding:"3px 5px",display:"flex",alignItems:"center"}}>
+            <img src={LOGOS.lasalle} alt="Colegio Regiomontano Contry La Salle"
+              style={{height:32,objectFit:"contain",display:"block"}}/>
           </div>
-          <div style={{fontFamily:F.mono,fontSize:7,marginTop:2,
-            letterSpacing:"0.07em",textTransform:"uppercase",
-            color:isDark?"rgba(244,239,230,0.18)":"#B8B3AA"}}>
-            Diseño pedagógico · Jesús Ángel Álvarez González
+          <div style={{background:"rgba(255,255,255,0.07)",borderRadius:5,
+            padding:"3px 5px",display:"flex",alignItems:"center"}}>
+            <img src={LOGOS.unesco} alt="UNESCO Escuelas Asociadas"
+              style={{height:28,objectFit:"contain",display:"block"}}/>
           </div>
         </div>
-      </div>
-      <div style={{fontFamily:F.mono,fontSize:7,textAlign:"right",
-        letterSpacing:"0.06em",textTransform:"uppercase",
-        color:isDark?"rgba(244,239,230,0.15)":"#C0BAB0"}}>
-        Ficha II · Marco Teórico · Física STEAM
-      </div>
-    </div>
+        <div style={{flex:1}}>
+          <div style={{display:"flex",alignItems:"center",gap:7}}>
+            <img src={LOGOS.cc_iso} alt="cc" style={{height:20}}/>
+            <img src={LOGOS.cc_word} alt="Casa Colectiva"
+              style={{height:14,filter:"brightness(0) invert(1)",opacity:0.85}}/>
+            <span style={{fontFamily:F.mono,fontSize:7,
+              color:"rgba(244,239,230,0.28)",letterSpacing:"0.10em",
+              textTransform:"uppercase"}}>· Ficha II · Marco teórico</span>
+          </div>
+          <div style={{fontFamily:F.mono,fontSize:7,marginTop:1,marginLeft:27,
+            color:"rgba(244,239,230,0.22)",letterSpacing:"0.07em",
+            textTransform:"uppercase"}}>
+            Colegio Regiomontano Contry La Salle · 2° Secundaria
+          </div>
+        </div>
+        <nav style={{display:"flex",gap:4}}>
+          {user&&[{k:"student",l:"Alumnos"},{k:"teacher",l:"Docente"}].map(v=>(
+            <button key={v.k} onClick={()=>setView(v.k)} style={{
+              padding:"5px 12px",borderRadius:4,cursor:"pointer",
+              fontFamily:F.body,fontSize:11,fontWeight:500,
+              background:view===v.k?CC.terracota:"transparent",
+              border:`1px solid ${view===v.k?CC.terracota:"rgba(244,239,230,0.15)"}`,
+              color:view===v.k?CC.papel:"rgba(244,239,230,0.50)",
+              transition:"all 180ms"}}>{v.l}</button>
+          ))}
+        </nav>
+      </header>
 
-    {/* ── Disclaimer ── */}
-    <div style={{borderTop:`1px solid ${isDark?
-      "rgba(244,239,230,0.05)":"rgba(109,106,101,0.10)"}`,
-      paddingTop:9}}>
-      <div style={{fontFamily:F.mono,fontSize:7.5,fontStyle:"italic",
-        textAlign:"center",lineHeight:1.75,letterSpacing:"0.03em",
-        color:isDark?"rgba(244,239,230,0.16)":"#C5BFB6"}}>
-        Esta herramienta tiene fines exclusivamente pedagógicos y no comerciales.
-        Ningún alumno fue reprobado durante su desarrollo — aunque varios prompts
-        sí necesitaron correcciones. El uso de los logotipos institucionales
-        corresponde al Colegio Regiomontano Contry La Salle
-        y a la Red de Escuelas Asociadas a la UNESCO.
-      </div>
+      {view==="student"&&user&&
+        <StudentPortal user={user} sesionActiva={sesionActiva}
+          onLogout={handleLogout}/>}
+      {view==="teacher"&&<TeacherPortal lastUpdate={lastUpdate}/>}
+
+      <footer style={{borderTop:`1px solid ${isDark?CC.tintaBorde:CC.grisPapel}`,
+        marginTop:44}}>
+        <div style={{background:CC.papelBlanco,padding:"14px 24px",display:"flex",
+          alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
+          <img src={LOGOS.lasalle} alt="Colegio Regiomontano Contry La Salle"
+            style={{height:42,objectFit:"contain"}}/>
+          <img src={LOGOS.unesco} alt="UNESCO Escuelas Asociadas"
+            style={{height:38,objectFit:"contain",opacity:0.80,filter:"grayscale(20%)"}}/>
+        </div>
+        <div style={{background:isDark?CC.tinta:"#EDE8DF",padding:"14px 24px"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+            flexWrap:"wrap",gap:10,marginBottom:10}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <img src={LOGOS.cc_iso} alt="cc" style={{height:24,opacity:0.65}}/>
+              <div>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <img src={LOGOS.cc_word} alt="Casa Colectiva"
+                    style={{height:13,opacity:0.55,
+                      filter:isDark?"brightness(0) invert(1)":"none"}}/>
+                  <span style={{fontFamily:F.mono,fontSize:7,letterSpacing:"0.07em",
+                    textTransform:"uppercase",
+                    color:isDark?"rgba(244,239,230,0.22)":"#9A9590"}}>
+                    © 2026 · Todos los derechos reservados
+                  </span>
+                </div>
+                <div style={{fontFamily:F.mono,fontSize:7,marginTop:2,
+                  letterSpacing:"0.07em",textTransform:"uppercase",
+                  color:isDark?"rgba(244,239,230,0.18)":"#B8B3AA"}}>
+                  Diseño pedagógico · Jesús Ángel Álvarez González
+                </div>
+              </div>
+            </div>
+            <div style={{fontFamily:F.mono,fontSize:7,textAlign:"right",
+              letterSpacing:"0.06em",textTransform:"uppercase",
+              color:isDark?"rgba(244,239,230,0.15)":"#C0BAB0"}}>
+              Ficha II · Marco Teórico · Física STEAM
+            </div>
+          </div>
+          <div style={{borderTop:`1px solid ${isDark?
+            "rgba(244,239,230,0.05)":"rgba(109,106,101,0.10)"}`,paddingTop:9}}>
+            <div style={{fontFamily:F.mono,fontSize:7.5,fontStyle:"italic",
+              textAlign:"center",lineHeight:1.75,letterSpacing:"0.03em",
+              color:isDark?"rgba(244,239,230,0.16)":"#C5BFB6"}}>
+              Esta herramienta tiene fines exclusivamente pedagógicos y no comerciales.
+              Ningún alumno fue reprobado durante su desarrollo — aunque varios prompts
+              sí necesitaron correcciones. El uso de los logotipos institucionales
+              corresponde al Colegio Regiomontano Contry La Salle
+              y a la Red de Escuelas Asociadas a la UNESCO.
+            </div>
+          </div>
+        </div>
+      </footer>
+
+      {showIdle&&user&&
+        <IdleModal user={user} onStay={handleStay} onLeave={handleLogout}/>}
     </div>
-  </div>
-</footer>
-    </div>
+  );
+}
   );
 }
