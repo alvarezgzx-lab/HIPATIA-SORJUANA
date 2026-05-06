@@ -173,15 +173,24 @@ function HipatiaModal({user,onClose}){
   const[creating,setCreating]=useState(false);
   const setF=(k,v)=>setForm(p=>({...p,[k]:v}));
 
-  const lookupMember=async(idx,nom)=>{
-    if(nom.length!==4){
-      setMembers(p=>p.map((m,i)=>i===idx?{...m,nombre:"",error:""}:m));
-      return;
-    }
-    setMembers(p=>p.map((m,i)=>i===idx?{...m,loading:true,error:""}:m));
-    const{data}=await supabase.from("alumnos").select("nombre,grupo").eq("nomenclatura",nom.toUpperCase()).single();
-    setMembers(p=>p.map((m,i)=>i===idx?{...m,nombre:data?.nombre||"",loading:false,error:data?"":("No encontrado: "+nom)}:m));
-  };
+const lookupMember = async(idx, nom) => {
+  if(nom.length !== 4){
+    setMembers(p=>p.map((m,i)=>
+      i===idx?{...m,nombre:"",error:""}:m));
+    return;
+  }
+  setMembers(p=>p.map((m,i)=>
+    i===idx?{...m,loading:true,error:""}:m));
+  const{data} = await supabase
+    .rpc("buscar_alumno",{p_nomenclatura:nom.toUpperCase()});
+  const alumno = data?.[0];
+  setMembers(p=>p.map((m,i)=>i===idx?{
+    ...m,
+    nombre:alumno?.nombre||"",
+    loading:false,
+    error:alumno?"":"No encontrado: "+nom
+  }:m));
+};
 
   const addMember=()=>{if(members.length<7)setMembers(p=>[...p,{nom:"",nombre:"",loading:false,error:""}]);};
   const removeMember=idx=>setMembers(p=>p.filter((_,i)=>i!==idx));
