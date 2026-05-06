@@ -205,7 +205,7 @@ function IdleModal({user,onStay,onLeave}){
   );
 }
 // ─── HIPATIA MODAL ────────────────────────────────────────────────────────────
-root({user,onClose}){
+function HipatiaModal({user,onClose}){
   const today=new Date().toISOString().split("T")[0];
   const[members,setMembers]=useState([{nom:user.nomenclatura,nombre:user.nombre,loading:false,error:""}]);
   const[form,setForm]=useState({fecha:today,sesion:"Primera",retorno:"",ficha:"Sí",asign:"Asignado"});
